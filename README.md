@@ -5,18 +5,20 @@ A Python GUI application designed to help organize large music collections (7000
 ## Overview
 
 This tool allows you to:
-- Browse and select source folders containing unorganized music files
+- Browse and select multiple source folders containing unorganized music files
+- Choose any destination folder for your organized music collection
 - Go through each song individually and decide where to organize it
 - Create new folders or add to existing ones on-the-fly
 - Save progress and resume later (essential for large collections)
 - Detect and handle duplicate files
 - Safely preview the organization plan before executing file moves
-- Move all files to a clean organized structure on your Desktop
+- Move all files to a clean organized structure in your chosen location
 
 ## Features
 
 ### Core Functionality
 - **GUI Folder Browser**: Select multiple source directories containing music
+- **Custom Destination**: Choose any folder for your organized music collection
 - **Multi-format Support**: Scans for mp3, mp4, m4a, wav, flac, aac, ogg files
 - **Interactive Organization**: Review each song and choose destination
 - **Progress Persistence**: Save/load progress across multiple sessions
@@ -31,7 +33,7 @@ For each song, you can:
 - Navigate back to previous songs
 
 ### File Management
-- **Destination**: Creates `~/Desktop/Organized_Music/` folder
+- **Custom Destination**: Creates `Organized_Music/` folder in your chosen location
 - **Folder Structure**: Creates subfolders based on your choices
 - **Duplicate Handling**: Renames files if name conflicts occur
 - **Safe Moves**: Uses `shutil.move()` to preserve file integrity
@@ -50,10 +52,11 @@ For each song, you can:
 
 ## How to Use
 
-### Step 1: Select Source Folders
+### Step 1: Select Source Folders and Destination
 1. Click "Browse Folders" to select directories containing music files
 2. You can select multiple folders - each one will be added to the list
-3. Click "Scan for Music" to find all audio files
+3. Click "Choose Destination" to select where your organized music will be saved (defaults to Desktop)
+4. Click "Scan for Music" to find all audio files
 
 ### Step 2: Review and Organize Songs
 1. The application shows each song filename and full path
@@ -67,7 +70,7 @@ For each song, you can:
 ### Step 3: Execute Organization
 1. Click "View Plan" to review all organization decisions
 2. Click "Execute Moves" to actually move the files
-3. Files will be moved to `~/Desktop/Organized_Music/[FolderName]/`
+3. Files will be moved to `[YourChosenDestination]/Organized_Music/[FolderName]/`
 
 ## Progress Management
 
@@ -92,8 +95,8 @@ OrganizeMusic/
 ├── music_organizer_progress.json   # Progress save file (auto-created)
 └── README.md                       # This file
 
-~/Desktop/Organized_Music/          # Destination folder (auto-created)
-├── Rock/                          # Example folders you create
+[YourChosenDestination]/Organized_Music/  # Destination folder (auto-created)
+├── Rock/                               # Example folders you create
 ├── Jazz/
 ├── Classical/
 └── ...

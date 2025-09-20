@@ -25,9 +25,10 @@ class MusicOrganizer:
         self.organization_plan = {}  # song_path -> destination_folder
         self.duplicates = defaultdict(list)  # file_hash -> list of file_paths
 
-        # Destination folder on desktop
+        # Destination folder (initially on desktop, but user can change)
         self.desktop_path = Path.home() / "Desktop"
-        self.organized_music_path = self.desktop_path / "Organized_Music"
+        self.destination_base_path = self.desktop_path  # Default to desktop
+        self.organized_music_path = self.destination_base_path / "Organized_Music"
 
         self.setup_ui()
         self.load_progress()
@@ -37,26 +38,30 @@ class MusicOrganizer:
         main_frame = ttk.Frame(self.root, padding="10")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
 
-        # Step 1: Select source folders
-        ttk.Label(main_frame, text="Step 1: Select Source Folders", font=("Arial", 12, "bold")).grid(row=0, column=0, columnspan=3, pady=10)
+        # Step 1: Select source folders and destination
+        ttk.Label(main_frame, text="Step 1: Select Source Folders and Destination", font=("Arial", 12, "bold")).grid(row=0, column=0, columnspan=3, pady=10)
 
         ttk.Button(main_frame, text="Browse Folders", command=self.browse_folders).grid(row=1, column=0, padx=5)
-        ttk.Button(main_frame, text="Scan for Music", command=self.scan_music).grid(row=1, column=1, padx=5)
+        ttk.Button(main_frame, text="Choose Destination", command=self.choose_destination).grid(row=1, column=1, padx=5)
+        ttk.Button(main_frame, text="Scan for Music", command=self.scan_music).grid(row=1, column=2, padx=5)
 
         self.folders_label = ttk.Label(main_frame, text="No folders selected", wraplength=400)
         self.folders_label.grid(row=2, column=0, columnspan=3, pady=5)
 
+        self.destination_label = ttk.Label(main_frame, text=f"Destination: {self.organized_music_path}", wraplength=600, foreground="blue")
+        self.destination_label.grid(row=3, column=0, columnspan=3, pady=5)
+
         # Step 2: Song organization
-        ttk.Separator(main_frame, orient='horizontal').grid(row=3, column=0, columnspan=3, sticky="ew", pady=20)
-        ttk.Label(main_frame, text="Step 2: Organize Songs", font=("Arial", 12, "bold")).grid(row=4, column=0, columnspan=3, pady=10)
+        ttk.Separator(main_frame, orient='horizontal').grid(row=4, column=0, columnspan=3, sticky="ew", pady=20)
+        ttk.Label(main_frame, text="Step 2: Organize Songs", font=("Arial", 12, "bold")).grid(row=5, column=0, columnspan=3, pady=10)
 
         # Progress info
         self.progress_label = ttk.Label(main_frame, text="")
-        self.progress_label.grid(row=5, column=0, columnspan=3, pady=5)
+        self.progress_label.grid(row=6, column=0, columnspan=3, pady=5)
 
         # Current song info
         self.song_frame = ttk.LabelFrame(main_frame, text="Current Song", padding="10")
-        self.song_frame.grid(row=6, column=0, columnspan=3, pady=10, sticky="ew")
+        self.song_frame.grid(row=7, column=0, columnspan=3, pady=10, sticky="ew")
 
         self.song_name_label = ttk.Label(self.song_frame, text="", font=("Arial", 11), wraplength=600)
         self.song_name_label.grid(row=0, column=0, columnspan=3, pady=5)
@@ -66,7 +71,7 @@ class MusicOrganizer:
 
         # Organization options
         options_frame = ttk.Frame(main_frame)
-        options_frame.grid(row=7, column=0, columnspan=3, pady=10)
+        options_frame.grid(row=8, column=0, columnspan=3, pady=10)
 
         ttk.Button(options_frame, text="Add to Existing Folder", command=self.add_to_existing).grid(row=0, column=0, padx=5)
         ttk.Button(options_frame, text="Create New Folder", command=self.create_new_folder).grid(row=0, column=1, padx=5)
@@ -74,16 +79,16 @@ class MusicOrganizer:
 
         # Navigation
         nav_frame = ttk.Frame(main_frame)
-        nav_frame.grid(row=8, column=0, columnspan=3, pady=10)
+        nav_frame.grid(row=9, column=0, columnspan=3, pady=10)
 
         ttk.Button(nav_frame, text="Previous", command=self.previous_song).grid(row=0, column=0, padx=5)
         ttk.Button(nav_frame, text="Next", command=self.next_song).grid(row=0, column=1, padx=5)
 
         # Final actions
-        ttk.Separator(main_frame, orient='horizontal').grid(row=9, column=0, columnspan=3, sticky="ew", pady=20)
+        ttk.Separator(main_frame, orient='horizontal').grid(row=10, column=0, columnspan=3, sticky="ew", pady=20)
 
         final_frame = ttk.Frame(main_frame)
-        final_frame.grid(row=10, column=0, columnspan=3, pady=10)
+        final_frame.grid(row=11, column=0, columnspan=3, pady=10)
 
         ttk.Button(final_frame, text="Save Progress", command=self.save_progress).grid(row=0, column=0, padx=5)
         ttk.Button(final_frame, text="Execute Moves", command=self.execute_moves).grid(row=0, column=1, padx=5)
@@ -107,6 +112,14 @@ class MusicOrganizer:
             self.folders_label.config(text=folders_text)
         else:
             self.folders_label.config(text="No folders selected")
+
+    def choose_destination(self):
+        destination = filedialog.askdirectory(title="Choose destination for organized music")
+        if destination:
+            self.destination_base_path = Path(destination)
+            self.organized_music_path = self.destination_base_path / "Organized_Music"
+            self.destination_label.config(text=f"Destination: {self.organized_music_path}")
+            messagebox.showinfo("Destination Set", f"Music will be organized to:\n{self.organized_music_path}")
 
     def scan_music(self):
         if not self.source_folders:
@@ -295,7 +308,8 @@ class MusicOrganizer:
             'processed_songs': list(self.processed_songs),
             'current_index': self.current_index,
             'organization_plan': self.organization_plan,
-            'duplicates': dict(self.duplicates)
+            'duplicates': dict(self.duplicates),
+            'destination_base_path': str(self.destination_base_path)
         }
 
         try:
@@ -317,6 +331,13 @@ class MusicOrganizer:
                 self.current_index = progress_data.get('current_index', 0)
                 self.organization_plan = progress_data.get('organization_plan', {})
                 self.duplicates = defaultdict(list, progress_data.get('duplicates', {}))
+
+                # Load destination path if saved, otherwise use default
+                saved_destination = progress_data.get('destination_base_path')
+                if saved_destination:
+                    self.destination_base_path = Path(saved_destination)
+                    self.organized_music_path = self.destination_base_path / "Organized_Music"
+                    self.destination_label.config(text=f"Destination: {self.organized_music_path}")
 
                 self.update_folders_display()
                 self.update_progress_display()
@@ -394,7 +415,7 @@ class MusicOrganizer:
                 errors.append(f"{song_path}: {str(e)}")
 
         # Show results
-        message = f"Move completed!\nSuccess: {success_count}\nErrors: {error_count}"
+        message = f"Move completed!\nSuccess: {success_count}\nErrors: {error_count}\n\nFiles moved to: {self.organized_music_path}"
         if errors:
             message += f"\n\nFirst few errors:\n" + "\n".join(errors[:5])
 
