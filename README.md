@@ -27,10 +27,10 @@ This tool allows you to:
 
 ### Organization Options
 For each song, you can:
-- Add to existing folder (choose from dropdown)
-- Create new folder (type custom name)
-- Skip song (leave in original location)
-- Navigate back to previous songs
+- **Add to existing folder**: Choose from both physically existing folders and folders created during current session
+- **Create new folder**: Type custom name (immediately becomes available for subsequent songs)
+- **Skip song**: Leave in original location
+- **Navigate back to previous songs**: Review and modify previous decisions
 
 ### File Management
 - **Custom Destination**: Creates `Organized_Music/` folder in your chosen location
@@ -61,11 +61,13 @@ For each song, you can:
 ### Step 2: Review and Organize Songs
 1. The application shows each song filename and full path
 2. For each song, choose one of:
-   - **Add to Existing Folder**: Choose from previously created folders
-   - **Create New Folder**: Type a new folder name (e.g., "Rock", "Jazz", "Workout")
+   - **Add to Existing Folder**: Choose from both existing folders and folders created in current session
+   - **Create New Folder**: Type a new folder name (e.g., "Rock", "Jazz", "Workout") - immediately available for next songs
    - **Skip Song**: Leave in original location
 3. Use "Previous"/"Next" to navigate between songs
 4. **Save Progress frequently** (every 50-100 songs recommended)
+
+**Improved Workflow**: When you create a new folder like "Rock", it immediately appears in the "Add to Existing Folder" list for subsequent songs - no need to wait until after executing moves!
 
 ### Step 3: Execute Organization
 1. Click "View Plan" to review all organization decisions
@@ -79,6 +81,7 @@ For each song, you can:
 - Automatically loads previous session on startup
 - Tracks which songs have been processed
 - Remembers current position in the list
+- Saves created folder names for immediate availability in subsequent sessions
 
 ### Multi-Session Workflow
 1. Process songs until you need a break

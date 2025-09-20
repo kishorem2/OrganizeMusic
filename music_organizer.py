@@ -23,6 +23,7 @@ class MusicOrganizer:
         self.processed_songs = set()
         self.current_index = 0
         self.organization_plan = {}  # song_path -> destination_folder
+        self.created_folders = set()  # Track folders created during organization
         self.duplicates = defaultdict(list)  # file_hash -> list of file_paths
 
         # Destination folder (initially on desktop, but user can change)
@@ -214,17 +215,20 @@ class MusicOrganizer:
         self.song_path_label.config(text=f"Path: {current_song}")
 
     def add_to_existing(self):
-        if not self.organized_music_path.exists():
-            messagebox.showinfo("Info", "No organized folders exist yet. Use 'Create New Folder' first.")
+        # Get physically existing folders
+        existing_folders = []
+        if self.organized_music_path.exists():
+            existing_folders = [d.name for d in self.organized_music_path.iterdir() if d.is_dir()]
+
+        # Combine with folders created during this session
+        all_folders = set(existing_folders) | self.created_folders
+
+        if not all_folders:
+            messagebox.showinfo("Info", "No folders available yet. Use 'Create New Folder' first.")
             return
 
-        existing_folders = [d.name for d in self.organized_music_path.iterdir() if d.is_dir()]
-        if not existing_folders:
-            messagebox.showinfo("Info", "No organized folders exist yet. Use 'Create New Folder' first.")
-            return
-
-        # Create selection dialog
-        self.select_folder_dialog(existing_folders)
+        # Create selection dialog with all available folders
+        self.select_folder_dialog(sorted(list(all_folders)))
 
     def select_folder_dialog(self, folders):
         dialog = tk.Toplevel(self.root)
@@ -275,6 +279,7 @@ class MusicOrganizer:
         if self.current_index < len(self.all_songs):
             current_song = self.all_songs[self.current_index]
             self.organization_plan[current_song] = folder_name
+            self.created_folders.add(folder_name)  # Track this folder as created
             self.processed_songs.add(current_song)
             self.next_song()
 
@@ -308,6 +313,7 @@ class MusicOrganizer:
             'processed_songs': list(self.processed_songs),
             'current_index': self.current_index,
             'organization_plan': self.organization_plan,
+            'created_folders': list(self.created_folders),
             'duplicates': dict(self.duplicates),
             'destination_base_path': str(self.destination_base_path)
         }
@@ -330,6 +336,7 @@ class MusicOrganizer:
                 self.processed_songs = set(progress_data.get('processed_songs', []))
                 self.current_index = progress_data.get('current_index', 0)
                 self.organization_plan = progress_data.get('organization_plan', {})
+                self.created_folders = set(progress_data.get('created_folders', []))
                 self.duplicates = defaultdict(list, progress_data.get('duplicates', {}))
 
                 # Load destination path if saved, otherwise use default
@@ -424,6 +431,7 @@ class MusicOrganizer:
         # Clear the plan after successful execution
         if error_count == 0:
             self.organization_plan.clear()
+            # Don't clear created_folders since they now physically exist
             self.save_progress()
 
     def run(self):
