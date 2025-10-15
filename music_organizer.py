@@ -285,6 +285,24 @@ class MusicOrganizer:
             self.destination_label.config(text=f"Destination: {self.organized_music_path}")
             messagebox.showinfo("Destination Set", f"Music will be organized to:\n{self.organized_music_path}")
 
+    def get_organized_files_hashes(self):
+        """Build a dictionary of file hashes for all songs in the organized music folder"""
+        organized_hashes = {}
+
+        if not self.organized_music_path.exists():
+            return organized_hashes
+
+        # Scan all files in organized music folder
+        for folder_path in self.organized_music_path.iterdir():
+            if folder_path.is_dir():
+                for file_path in folder_path.iterdir():
+                    if file_path.is_file() and any(file_path.name.lower().endswith(ext) for ext in self.music_extensions):
+                        file_hash = self.get_file_hash(str(file_path))
+                        if file_hash:
+                            organized_hashes[file_hash] = str(file_path)
+
+        return organized_hashes
+
     def scan_music(self):
         if not self.source_folders:
             messagebox.showwarning("Warning", "Please select source folders first!")
@@ -293,6 +311,11 @@ class MusicOrganizer:
         self.all_songs = []
         self.duplicates.clear()
         file_hashes = {}
+
+        # Get hashes of already organized songs
+        organized_hashes = self.get_organized_files_hashes()
+        already_organized_count = 0
+        already_organized_songs = []
 
         progress_window = tk.Toplevel(self.root)
         progress_window.title("Scanning...")
@@ -305,10 +328,17 @@ class MusicOrganizer:
                 for file in files:
                     if any(file.lower().endswith(ext) for ext in self.music_extensions):
                         file_path = os.path.join(root, file)
+                        file_hash = self.get_file_hash(file_path)
+
+                        # Check if this song is already organized
+                        if file_hash and file_hash in organized_hashes:
+                            already_organized_count += 1
+                            already_organized_songs.append((file_path, organized_hashes[file_hash]))
+                            continue  # Skip this song, it's already organized
+
                         self.all_songs.append(file_path)
 
-                        # Check for duplicates
-                        file_hash = self.get_file_hash(file_path)
+                        # Check for duplicates within new songs
                         if file_hash in file_hashes:
                             self.duplicates[file_hash].append(file_path)
                             if len(self.duplicates[file_hash]) == 1:
@@ -319,7 +349,12 @@ class MusicOrganizer:
         progress_window.destroy()
 
         # Show scan results
-        message = f"Found {len(self.all_songs)} music files"
+        message = f"Found {len(self.all_songs)} new music files"
+        if already_organized_count > 0:
+            message += f"\nSkipped {already_organized_count} songs already in organized folders"
+            if messagebox.askyesno("Already Organized Songs", f"{message}\n\nWould you like to see the list of already organized songs?"):
+                self.show_already_organized(already_organized_songs)
+
         if self.duplicates:
             message += f"\nFound {len(self.duplicates)} sets of duplicate files"
             if messagebox.askyesno("Duplicates Found", f"{message}\n\nWould you like to see the duplicates?"):
@@ -353,6 +388,26 @@ class MusicOrganizer:
             for file_path in file_list:
                 text_widget.insert(tk.END, f"  {file_path}\n")
             text_widget.insert(tk.END, "\n")
+
+        text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+    def show_already_organized(self, already_organized_songs):
+        """Show a list of songs that were skipped because they're already organized"""
+        org_window = tk.Toplevel(self.root)
+        org_window.title("Already Organized Songs (Skipped)")
+        org_window.geometry("900x500")
+
+        text_widget = tk.Text(org_window, wrap=tk.WORD)
+        scrollbar = ttk.Scrollbar(org_window, orient="vertical", command=text_widget.yview)
+        text_widget.configure(yscrollcommand=scrollbar.set)
+
+        text_widget.insert(tk.END, f"The following {len(already_organized_songs)} songs were skipped because they already exist in your organized music folders:\n\n")
+
+        for new_path, organized_path in already_organized_songs:
+            text_widget.insert(tk.END, f"New location: {new_path}\n")
+            text_widget.insert(tk.END, f"Already exists at: {organized_path}\n")
+            text_widget.insert(tk.END, "-" * 80 + "\n\n")
 
         text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
@@ -1070,7 +1125,7 @@ class MusicOrganizer:
 
     def update_seek_bar(self):
         """Update seek bar position based on current playback position"""
-        if pygame.mixer.music.get_busy() and not self.is_paused:
+        if pygame.mixer.music.get_busy() and not self.is_paused and not self.seeking:
             # Get current position (in seconds)
             pos = pygame.mixer.music.get_pos() / 1000.0
 
@@ -1088,8 +1143,11 @@ class MusicOrganizer:
             # Schedule next update
             self.seek_update_job = self.root.after(100, self.update_seek_bar)
         elif self.is_paused:
-            # Keep the position when paused
-            pass
+            # Keep the position when paused, but continue checking
+            self.seek_update_job = self.root.after(100, self.update_seek_bar)
+        elif self.seeking:
+            # Don't update position while user is seeking
+            self.seek_update_job = self.root.after(100, self.update_seek_bar)
         else:
             # Song ended or stopped
             if self.currently_playing:
