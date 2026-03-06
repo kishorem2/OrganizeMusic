@@ -16,7 +16,7 @@ class MusicOrganizer:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("Music Organizer")
-        self.root.geometry("900x800")
+        self.root.geometry("1200x800")  # Wider to accommodate folder panel
 
         # Music file extensions
         self.music_extensions = {'.mp3', '.mp4', '.m4a', '.wav', '.flac', '.aac', '.ogg'}
@@ -35,6 +35,10 @@ class MusicOrganizer:
         self.selected_songs = set()  # Track selected songs
         self.song_checkboxes = {}  # song_path -> checkbox_var
         self.last_selected_index = None  # For shift+click range selection
+
+        # Folder selection tracking
+        self.selected_folder = None  # Currently selected folder for assignment
+        self.folder_listbox = None  # Reference to the folder listbox widget
 
         # Destination folder (initially on desktop, but user can change)
         self.desktop_path = Path.home() / "Desktop"
@@ -142,19 +146,42 @@ class MusicOrganizer:
         sort_dropdown.grid(row=0, column=1, padx=5)
         sort_dropdown.bind("<<ComboboxSelected>>", lambda e: self.populate_song_list())
 
-        # Song list frame
+        # Song list frame (left side)
         self.song_list_frame = ttk.LabelFrame(main_frame, text="Songs to Organize", padding="10")
-        self.song_list_frame.grid(row=8, column=0, columnspan=3, pady=10, sticky="ew")
+        self.song_list_frame.grid(row=8, column=0, columnspan=2, pady=10, sticky="nsew")
 
         # Create scrollable frame for song list
         self.setup_song_list_widget()
 
+        # Folder selection frame (right side) - persistent folder list
+        folder_selection_frame = ttk.LabelFrame(main_frame, text="Available Folders", padding="10")
+        folder_selection_frame.grid(row=8, column=2, columnspan=2, pady=10, padx=(10, 0), sticky="nsew")
+
+        ttk.Label(folder_selection_frame, text="Select a folder:").pack(pady=(0, 5))
+
+        # Listbox for folders with scrollbar
+        folder_list_container = ttk.Frame(folder_selection_frame)
+        folder_list_container.pack(fill=tk.BOTH, expand=True)
+
+        folder_scrollbar = ttk.Scrollbar(folder_list_container, orient="vertical")
+        self.folder_listbox = tk.Listbox(folder_list_container, yscrollcommand=folder_scrollbar.set, height=15)
+        folder_scrollbar.config(command=self.folder_listbox.yview)
+
+        self.folder_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        folder_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Bind selection event
+        self.folder_listbox.bind('<<ListboxSelect>>', self.on_folder_select)
+
+        # Refresh button
+        ttk.Button(folder_selection_frame, text="Refresh Folders", command=self.refresh_folder_list).pack(pady=(5, 0), fill=tk.X)
+
         # Organization options
         options_frame = ttk.Frame(main_frame)
-        options_frame.grid(row=9, column=0, columnspan=3, pady=10)
+        options_frame.grid(row=9, column=0, columnspan=4, pady=10)
 
-        ttk.Button(options_frame, text="Add Selected to Existing Folder", command=self.add_selected_to_existing).grid(row=0, column=0, padx=5)
-        ttk.Button(options_frame, text="Add Selected to New Folder", command=self.create_new_folder_for_selected).grid(row=0, column=1, padx=5)
+        ttk.Button(options_frame, text="Assign to Selected Folder", command=self.assign_to_selected_folder).grid(row=0, column=0, padx=5)
+        ttk.Button(options_frame, text="Create New Folder", command=self.create_new_folder_for_selected).grid(row=0, column=1, padx=5)
         ttk.Button(options_frame, text="Skip Selected", command=self.skip_selected_songs).grid(row=0, column=2, padx=5)
 
         # Final actions
@@ -281,8 +308,19 @@ class MusicOrganizer:
         destination = filedialog.askdirectory(title="Choose destination for organized music")
         if destination:
             self.destination_base_path = Path(destination)
-            self.organized_music_path = self.destination_base_path / "Organized_Music"
+
+            # Check if user selected the Organized_Music folder itself
+            if self.destination_base_path.name == "Organized_Music":
+                # User selected the Organized_Music folder directly, so use it
+                self.organized_music_path = self.destination_base_path
+                # Update base path to parent
+                self.destination_base_path = self.destination_base_path.parent
+            else:
+                # User selected the parent folder, so append Organized_Music
+                self.organized_music_path = self.destination_base_path / "Organized_Music"
+
             self.destination_label.config(text=f"Destination: {self.organized_music_path}")
+            self.refresh_folder_list()  # Refresh folder list when destination changes
             messagebox.showinfo("Destination Set", f"Music will be organized to:\n{self.organized_music_path}")
 
     def get_organized_files_hashes(self):
@@ -363,6 +401,7 @@ class MusicOrganizer:
         messagebox.showinfo("Scan Complete", message)
         self.update_progress_display()
         self.populate_song_list()
+        self.refresh_folder_list()  # Refresh folder list after scan
 
     def get_file_hash(self, file_path):
         hash_md5 = hashlib.md5()
@@ -568,20 +607,72 @@ class MusicOrganizer:
         else:
             self.selection_count_label.config(text=f"{count} songs selected")
 
-    def add_selected_to_existing(self):
+    def on_folder_select(self, event):
+        """Called when a folder is selected from the listbox"""
+        selection = self.folder_listbox.curselection()
+        if selection:
+            selected_text = self.folder_listbox.get(selection[0])
+            # Extract folder name (remove the count part)
+            self.selected_folder = selected_text.split(" (")[0]
+
+    def refresh_folder_list(self):
+        """Refresh the folder list with current counts"""
+        if not self.folder_listbox:
+            return
+
+        # Clear current list
+        self.folder_listbox.delete(0, tk.END)
+
+        # Get folder counts
+        folder_counts = self.get_folder_song_counts()
+
+        if not folder_counts:
+            self.folder_listbox.insert(tk.END, "No folders available")
+            return
+
+        # Populate with folders and counts
+        for folder_name, count in sorted(folder_counts.items()):
+            display_name = f"{folder_name} ({count}/500)"
+            self.folder_listbox.insert(tk.END, display_name)
+
+    def assign_to_selected_folder(self):
+        """Assign selected songs to the currently selected folder"""
         if not self.selected_songs:
             messagebox.showwarning("Warning", "Please select songs first!")
             return
 
-        # Get physically existing folders with song counts
-        folder_counts = self.get_folder_song_counts()
-
-        if not folder_counts:
-            messagebox.showinfo("Info", "No folders available yet. Use 'Add Selected to New Folder' first.")
+        if not self.selected_folder:
+            messagebox.showwarning("Warning", "Please select a folder from the list!")
             return
 
-        # Create selection dialog with all available folders and counts
-        self.select_folder_dialog_with_counts(folder_counts)
+        # Get current counts
+        folder_counts = self.get_folder_song_counts()
+        current_count = folder_counts.get(self.selected_folder, 0)
+
+        # Check if adding selected songs would exceed 500
+        if current_count + len(self.selected_songs) > 500:
+            overflow = current_count + len(self.selected_songs) - 500
+            result = messagebox.askyesno(
+                "Folder Full",
+                f"Adding {len(self.selected_songs)} songs to '{self.selected_folder}' would exceed the 500 song limit by {overflow} songs.\n\n"
+                f"Would you like to create '{self.get_next_folder_name(self.selected_folder)}' for the additional songs?"
+            )
+            if result:
+                self.assign_selected_to_folder_with_overflow(self.selected_folder, current_count)
+                self.refresh_folder_list()
+        else:
+            self.assign_selected_to_folder(self.selected_folder)
+            self.refresh_folder_list()
+
+    def add_selected_to_existing(self):
+        """Legacy function - now redirects to new workflow"""
+        if not self.selected_songs:
+            messagebox.showwarning("Warning", "Please select songs first!")
+            return
+
+        # Refresh folder list to show current state
+        self.refresh_folder_list()
+        messagebox.showinfo("Info", "Please select a folder from the 'Available Folders' list on the right, then click 'Assign to Selected Folder'.")
 
     def get_folder_song_counts(self):
         """Get song counts for all existing folders"""
@@ -873,6 +964,7 @@ class MusicOrganizer:
                 self.update_folders_display()
                 self.update_progress_display()
                 self.populate_song_list()
+                self.refresh_folder_list()  # Populate folder list on load
 
                 if self.all_songs:
                     messagebox.showinfo("Progress Loaded", f"Loaded progress: {len(self.processed_songs)}/{len(self.all_songs)} songs processed")
